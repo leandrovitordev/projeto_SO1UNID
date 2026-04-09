@@ -8,204 +8,186 @@
 
 using namespace std;
 
-using matriz_ = vector<vector<int>>;
+using Matriz = vector<vector<int>>;
 
-struct dados_thread_ {
-    int id_;
-    int linha_inicial_;
-    int linha_final_;
-    double tempo_ms_;
-    matriz_ resultado_parcial_;
+struct ThreadData {
+    int id;
+    int inicio;
+    int fim;
+    double tempo;
+    Matriz resultado;
 };
 
-matriz_ ler_matriz_(const string& nome_arquivo_) {
-    // Esta funcao le uma matriz de arquivo; neste caso o formato e o mesmo usado pelos outros programas;
-    ifstream arquivo_(nome_arquivo_);
+// lê matriz do arquivo
+Matriz lerMatriz(const string& nomeArquivo) {
+    ifstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        throw runtime_error("Erro ao abrir o arquivo: " + nome_arquivo_);
+    if (!arquivo.is_open()) {
+        throw runtime_error("erro ao abrir arquivo: " + nomeArquivo);
     }
 
-    int linhas_ = 0;
-    int colunas_ = 0;
-    arquivo_ >> linhas_ >> colunas_;
+    int linhas, colunas;
+    arquivo >> linhas >> colunas;
 
-    if (linhas_ <= 0 || colunas_ <= 0) {
-        throw runtime_error("Dimensoes invalidas no arquivo: " + nome_arquivo_);
+    if (linhas <= 0 || colunas <= 0) {
+        throw runtime_error("dimensoes invalidas em: " + nomeArquivo);
     }
 
-    matriz_ matriz_lida_(linhas_, vector<int>(colunas_, 0));
+    Matriz matriz(linhas, vector<int>(colunas, 0));
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // A leitura e sequencial e previsivel; Isso faz com que cada posicao seja preenchida corretamente;
-            arquivo_ >> matriz_lida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo >> matriz[i][j]; // leitura normal
         }
     }
 
-    arquivo_.close();
-    return matriz_lida_;
+    return matriz;
 }
 
-void salvar_matriz_(const string& nome_arquivo_, const matriz_& matriz_saida_, double tempo_total_) {
-    // Esta funcao grava o resultado parcial de cada thread; neste caso tambem salvamos o tempo individual;
-    ofstream arquivo_(nome_arquivo_);
+// salva resultado da thread
+void salvarMatriz(const string& nomeArquivo, const Matriz& matriz, double tempo) {
+    ofstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        cerr << "Erro ao abrir o arquivo: " << nome_arquivo_ << endl;
+    if (!arquivo.is_open()) {
+        cerr << "erro ao abrir arquivo: " << nomeArquivo << endl;
         return;
     }
 
-    int linhas_ = static_cast<int>(matriz_saida_.size());
-    int colunas_ = (linhas_ > 0) ? static_cast<int>(matriz_saida_[0].size()) : 0;
+    int linhas = matriz.size();
+    int colunas = (linhas > 0) ? matriz[0].size() : 0;
 
-    arquivo_ << linhas_ << " " << colunas_ << "\n";
+    arquivo << linhas << " " << colunas << "\n";
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // Gravamos somente o bloco calculado pela thread; Isso faz com que cada arquivo represente sua parcela;
-            arquivo_ << matriz_saida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo << matriz[i][j];
 
-            if (j_ + 1 < colunas_) {
-                arquivo_ << " ";
+            if (j + 1 < colunas) {
+                arquivo << " ";
             }
         }
-
-        arquivo_ << "\n";
+        arquivo << "\n";
     }
 
-    arquivo_ << "Tempo total (ms): " << tempo_total_ << "\n";
-    arquivo_.close();
+    arquivo << "Tempo total (ms): " << tempo << "\n";
 }
 
-void multiplicar_parte_(
-    const matriz_& matriz1_,
-    const matriz_& matriz2_,
-    matriz_& resultado_,
-    int linha_inicial_original_,
-    int linha_inicial_local_,
-    int linha_final_original_
+// multiplicação de um pedaço da matriz
+void multiplicarParte(
+    const Matriz& m1,
+    const Matriz& m2,
+    Matriz& resultado,
+    int inicio,
+    int base
 ) {
-    // Esta funcao calcula um bloco de linhas dentro de uma matriz parcial; neste caso usamos indices global e local;
-    int colunas_resultado_ = static_cast<int>(matriz2_[0].size());
-    int dimensao_interna_ = static_cast<int>(matriz2_.size());
+    int colunas = m2[0].size();
+    int comum = m2.size();
 
-    for (int i_original_ = linha_inicial_original_; i_original_ < linha_final_original_; ++i_original_) {
-        int i_local_ = i_original_ - linha_inicial_local_;
+    for (int i = inicio; i < base; i++) {
+        int iLocal = i - inicio;
 
-        for (int j_ = 0; j_ < colunas_resultado_; ++j_) {
-            int soma_ = 0;
+        for (int j = 0; j < colunas; j++) {
+            int soma = 0;
 
-            for (int k_ = 0; k_ < dimensao_interna_; ++k_) {
-                // Aplicamos a regra da multiplicacao matricial no intervalo da thread; Isso faz com que o trabalho seja dividido corretamente;
-                soma_ += matriz1_[i_original_][k_] * matriz2_[k_][j_];
+            for (int k = 0; k < comum; k++) {
+                soma += m1[i][k] * m2[k][j];
             }
 
-            resultado_[i_local_][j_] = soma_;
+            resultado[iLocal][j] = soma;
         }
     }
 }
 
-void executar_thread_(const matriz_& matriz1_, const matriz_& matriz2_, dados_thread_& dados_) {
-    // Cada thread mede apenas seu proprio trabalho; neste caso o arquivo sera salvo ao final da rotina;
-    int quantidade_linhas_ = dados_.linha_final_ - dados_.linha_inicial_;
-    int colunas_resultado_ = static_cast<int>(matriz2_[0].size());
+// função da thread
+void executarThread(const Matriz& m1, const Matriz& m2, ThreadData& dados) {
+    int linhas = dados.fim - dados.inicio;
+    int colunas = m2[0].size();
 
-    dados_.resultado_parcial_ = matriz_(quantidade_linhas_, vector<int>(colunas_resultado_, 0));
+    dados.resultado = Matriz(linhas, vector<int>(colunas, 0));
 
-    auto inicio_ = chrono::high_resolution_clock::now();
+    auto inicio = chrono::high_resolution_clock::now();
 
-    multiplicar_parte_(
-        matriz1_,
-        matriz2_,
-        dados_.resultado_parcial_,
-        dados_.linha_inicial_,
-        dados_.linha_inicial_,
-        dados_.linha_final_
-    );
+    multiplicarParte(m1, m2, dados.resultado, dados.inicio, dados.fim);
 
-    auto fim_ = chrono::high_resolution_clock::now();
-    dados_.tempo_ms_ = chrono::duration<double, milli>(fim_ - inicio_).count();
+    auto fim = chrono::high_resolution_clock::now();
 
-    string nome_arquivo_ = "resultado_thread_" + to_string(dados_.id_) + ".txt";
-    salvar_matriz_(nome_arquivo_, dados_.resultado_parcial_, dados_.tempo_ms_);
+    dados.tempo = chrono::duration<double, milli>(fim - inicio).count();
+
+    // salva resultado dessa thread
+    string nome = "resultado_thread_" + to_string(dados.id) + ".txt";
+    salvarMatriz(nome, dados.resultado, dados.tempo);
 }
 
-int main(int argc_, char* argv_[]) {
-    // O programa exige dois arquivos e a quantidade de threads; Isso faz com que a divisao possa ser configurada;
-    if (argc_ != 4) {
-        cerr << "Uso: ./threads matriz1.txt matriz2.txt T" << endl;
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        cerr << "uso: ./threads matriz1.txt matriz2.txt T" << endl;
         return 1;
     }
 
     try {
-        // A leitura ocorre antes da criacao das threads; neste caso seguimos exatamente o requisito solicitado;
-        matriz_ matriz1_ = ler_matriz_(argv_[1]);
-        matriz_ matriz2_ = ler_matriz_(argv_[2]);
-        int total_threads_ = stoi(argv_[3]);
+        Matriz m1 = lerMatriz(argv[1]);
+        Matriz m2 = lerMatriz(argv[2]);
+        int totalThreads = stoi(argv[3]);
 
-        if (total_threads_ <= 0) {
-            cerr << "Erro: T deve ser maior que zero." << endl;
+        if (totalThreads <= 0) {
+            cerr << "erro: numero de threads invalido" << endl;
             return 1;
         }
 
-        int n1_ = static_cast<int>(matriz1_.size());
-        int m1_ = static_cast<int>(matriz1_[0].size());
-        int n2_ = static_cast<int>(matriz2_.size());
-        int m2_ = static_cast<int>(matriz2_[0].size());
+        int n1 = m1.size();
+        int m1c = m1[0].size();
+        int n2 = m2.size();
 
-        // Validamos compatibilidade matricial antes da computacao; Isso faz com que o programa falhe de forma segura;
-        if (m1_ != n2_) {
-            cerr << "Erro: numero de colunas da primeira matriz deve ser igual ao numero de linhas da segunda matriz." << endl;
+        // checando compatibilidade
+        if (m1c != n2) {
+            cerr << "erro: matrizes incompativeis" << endl;
             return 1;
         }
 
-        // Se houver mais threads que linhas, limitamos o valor; neste caso evitamos criar trabalhadores sem carga;
-        if (total_threads_ > n1_) {
-            total_threads_ = n1_;
+        // evita criar thread sem trabalho
+        if (totalThreads > n1) {
+            totalThreads = n1;
         }
 
-        vector<thread> threads_;
-        vector<dados_thread_> dados_threads_(total_threads_);
+        vector<thread> threads;
+        vector<ThreadData> dados(totalThreads);
 
-        int linhas_base_ = n1_ / total_threads_;
-        int resto_ = n1_ % total_threads_;
-        int linha_atual_ = 0;
+        int base = n1 / totalThreads;
+        int resto = n1 % totalThreads;
+        int atual = 0;
 
-        for (int i_ = 0; i_ < total_threads_; ++i_) {
-            int extra_ = (i_ < resto_) ? 1 : 0;
-            int linha_inicial_ = linha_atual_;
-            int linha_final_ = linha_inicial_ + linhas_base_ + extra_;
+        for (int i = 0; i < totalThreads; i++) {
+            int extra = (i < resto) ? 1 : 0;
 
-            dados_threads_[i_].id_ = i_;
-            dados_threads_[i_].linha_inicial_ = linha_inicial_;
-            dados_threads_[i_].linha_final_ = linha_final_;
-            dados_threads_[i_].tempo_ms_ = 0.0;
+            dados[i].id = i;
+            dados[i].inicio = atual;
+            dados[i].fim = atual + base + extra;
+            dados[i].tempo = 0;
 
-            // Criamos cada thread com seu intervalo exclusivo; Isso faz com que nao exista disputa por escrita no mesmo bloco;
-            threads_.emplace_back(executar_thread_, cref(matriz1_), cref(matriz2_), ref(dados_threads_[i_]));
+            // cada thread pega um pedaço da matriz
+            threads.emplace_back(executarThread, cref(m1), cref(m2), ref(dados[i]));
 
-            linha_atual_ = linha_final_;
+            atual = dados[i].fim;
         }
 
-        for (thread& thread_atual_ : threads_) {
-            // Aguardamos o termino de todas as threads; neste caso garantimos que todos os arquivos ja foram gerados;
-            thread_atual_.join();
+        for (auto& t : threads) {
+            t.join(); // espera terminar tudo
         }
 
-        double tempo_total_ = 0.0;
+        double tempoTotal = 0;
 
-        for (const dados_thread_& dados_ : dados_threads_) {
-            // O tempo total e o maior entre os tempos individuais; Isso faz com que o criterio siga a especificacao;
-            if (dados_.tempo_ms_ > tempo_total_) {
-                tempo_total_ = dados_.tempo_ms_;
+        // pega o maior tempo (thread mais lenta)
+        for (const auto& d : dados) {
+            if (d.tempo > tempoTotal) {
+                tempoTotal = d.tempo;
             }
         }
 
-        cout << "Arquivos parciais das threads gerados com sucesso." << endl;
-        cout << "Tempo total (ms): " << tempo_total_ << endl;
-    } catch (const exception& erro_) {
-        cerr << erro_.what() << endl;
+        cout << "threads finalizadas" << endl;
+        cout << "Tempo total (ms): " << tempoTotal << endl;
+
+    } catch (const exception& e) {
+        cerr << e.what() << endl;
         return 1;
     }
 

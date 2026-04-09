@@ -7,132 +7,128 @@
 
 using namespace std;
 
-using matriz_ = vector<vector<int>>;
+using Matriz = vector<vector<int>>;
 
-matriz_ ler_matriz_(const string& nome_arquivo_) {
-    // Esta funcao le a matriz a partir de um arquivo texto; neste caso esperamos dimensoes na primeira linha;
-    ifstream arquivo_(nome_arquivo_);
+// lê a matriz do arquivo
+Matriz lerMatriz(const string& nomeArquivo) {
+    ifstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        // Se o arquivo nao abrir, encerramos com excecao logica; Isso faz com que o erro seja percebido rapidamente;
-        throw runtime_error("Erro ao abrir o arquivo: " + nome_arquivo_);
+    if (!arquivo.is_open()) {
+        throw runtime_error("erro ao abrir arquivo: " + nomeArquivo);
     }
 
-    int linhas_ = 0;
-    int colunas_ = 0;
-    arquivo_ >> linhas_ >> colunas_;
+    int linhas = 0;
+    int colunas = 0;
+    arquivo >> linhas >> colunas;
 
-    if (linhas_ <= 0 || colunas_ <= 0) {
-        // Uma matriz com dimensoes invalidas nao deve ser aceita; neste caso protegemos a execucao;
-        throw runtime_error("Dimensoes invalidas no arquivo: " + nome_arquivo_);
+    if (linhas <= 0 || colunas <= 0) {
+        throw runtime_error("dimensoes invalidas em: " + nomeArquivo);
     }
 
-    matriz_ matriz_lida_(linhas_, vector<int>(colunas_, 0));
+    Matriz matriz(linhas, vector<int>(colunas, 0));
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // Lemos cada elemento exatamente na posicao correspondente; Isso faz com que a matriz preserve sua estrutura;
-            arquivo_ >> matriz_lida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo >> matriz[i][j]; // leitura direta msm
         }
     }
 
-    arquivo_.close();
-    return matriz_lida_;
+    arquivo.close();
+    return matriz;
 }
 
-void salvar_matriz_(const string& nome_arquivo_, const matriz_& matriz_saida_, double tempo_total_) {
-    // Esta funcao grava a matriz resultado e o tempo final; neste caso o tempo vai ao final do arquivo;
-    ofstream arquivo_(nome_arquivo_);
+// salva resultado no arquivo
+void salvarMatriz(const string& nomeArquivo, const Matriz& matriz, double tempo) {
+    ofstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        cerr << "Erro ao abrir o arquivo: " << nome_arquivo_ << endl;
+    if (!arquivo.is_open()) {
+        cerr << "erro ao abrir arquivo: " << nomeArquivo << endl;
         return;
     }
 
-    int linhas_ = static_cast<int>(matriz_saida_.size());
-    int colunas_ = (linhas_ > 0) ? static_cast<int>(matriz_saida_[0].size()) : 0;
+    int linhas = matriz.size();
+    int colunas = (linhas > 0) ? matriz[0].size() : 0;
 
-    arquivo_ << linhas_ << " " << colunas_ << "\n";
+    arquivo << linhas << " " << colunas << "\n";
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // Escrevemos cada valor da matriz resultado; Isso faz com que o arquivo possa ser reutilizado facilmente;
-            arquivo_ << matriz_saida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo << matriz[i][j];
 
-            if (j_ + 1 < colunas_) {
-                arquivo_ << " ";
+            if (j + 1 < colunas) {
+                arquivo << " ";
             }
         }
-
-        arquivo_ << "\n";
+        arquivo << "\n";
     }
 
-    arquivo_ << "Tempo total (ms): " << tempo_total_ << "\n";
-    arquivo_.close();
+    arquivo << "Tempo total (ms): " << tempo << "\n";
+    arquivo.close();
 }
 
-void multiplicar_parte_(
-    const matriz_& matriz1_,
-    const matriz_& matriz2_,
-    matriz_& resultado_,
-    int linha_inicial_,
-    int linha_final_
+// faz a multiplicação (parte ou tudo)
+void multiplicarParte(
+    const Matriz& m1,
+    const Matriz& m2,
+    Matriz& resultado,
+    int linhaInicio,
+    int linhaFim
 ) {
-    // Esta funcao calcula apenas um intervalo de linhas; neste caso ela tambem serve para reuso nos outros programas;
-    int colunas_resultado_ = static_cast<int>(matriz2_[0].size());
-    int dimensao_interna_ = static_cast<int>(matriz2_.size());
+    int colunas = m2[0].size();
+    int comum = m2.size();
 
-    for (int i_ = linha_inicial_; i_ < linha_final_; ++i_) {
-        for (int j_ = 0; j_ < colunas_resultado_; ++j_) {
-            int soma_ = 0;
+    for (int i = linhaInicio; i < linhaFim; i++) {
+        for (int j = 0; j < colunas; j++) {
+            int soma = 0;
 
-            for (int k_ = 0; k_ < dimensao_interna_; ++k_) {
-                // Aqui ocorre a multiplicacao classica linha por coluna; Isso faz com que o resultado siga a definicao matematica;
-                soma_ += matriz1_[i_][k_] * matriz2_[k_][j_];
+            for (int k = 0; k < comum; k++) {
+                soma += m1[i][k] * m2[k][j]; // multiplicação padrão
             }
 
-            resultado_[i_][j_] = soma_;
+            resultado[i][j] = soma;
         }
     }
 }
 
-int main(int argc_, char* argv_[]) {
-    // O programa sequencial exige dois arquivos de entrada; neste caso usamos exatamente os nomes passados pelo usuario;
-    if (argc_ != 3) {
-        cerr << "Uso: ./sequencial matriz1.txt matriz2.txt" << endl;
+int main(int argc, char* argv[]) {
+    if (argc != 3) {
+        cerr << "uso: ./sequencial matriz1.txt matriz2.txt" << endl;
         return 1;
     }
 
     try {
-        matriz_ matriz1_ = ler_matriz_(argv_[1]);
-        matriz_ matriz2_ = ler_matriz_(argv_[2]);
+        Matriz matriz1 = lerMatriz(argv[1]);
+        Matriz matriz2 = lerMatriz(argv[2]);
 
-        int n1_ = static_cast<int>(matriz1_.size());
-        int m1_ = static_cast<int>(matriz1_[0].size());
-        int n2_ = static_cast<int>(matriz2_.size());
-        int m2_ = static_cast<int>(matriz2_[0].size());
+        int n1 = matriz1.size();
+        int m1 = matriz1[0].size();
+        int n2 = matriz2.size();
+        int m2 = matriz2[0].size();
 
-        // Antes da multiplicacao, validamos compatibilidade; Isso faz com que nao haja acesso indevido a memoria;
-        if (m1_ != n2_) {
-            cerr << "Erro: numero de colunas da primeira matriz deve ser igual ao numero de linhas da segunda matriz." << endl;
+        // verifica se dá pra multiplicar
+        if (m1 != n2) {
+            cerr << "erro: matrizes incompativeis" << endl;
             return 1;
         }
 
-        matriz_ resultado_(n1_, vector<int>(m2_, 0));
+        Matriz resultado(n1, vector<int>(m2, 0));
 
-        auto inicio_ = chrono::high_resolution_clock::now();
-        multiplicar_parte_(matriz1_, matriz2_, resultado_, 0, n1_);
-        auto fim_ = chrono::high_resolution_clock::now();
+        auto inicio = chrono::high_resolution_clock::now();
 
-        double tempo_total_ = chrono::duration<double, milli>(fim_ - inicio_).count();
+        // aqui roda tudo sequencial mesmo
+        multiplicarParte(matriz1, matriz2, resultado, 0, n1);
 
-        salvar_matriz_("resultado_sequencial.txt", resultado_, tempo_total_);
+        auto fim = chrono::high_resolution_clock::now();
 
-        cout << "Resultado salvo em resultado_sequencial.txt" << endl;
-        cout << "Tempo total (ms): " << tempo_total_ << endl;
-    } catch (const exception& erro_) {
-        // Qualquer falha de leitura ou formato chega aqui; neste caso a mensagem e mostrada ao usuario;
-        cerr << erro_.what() << endl;
+        double tempo = chrono::duration<double, milli>(fim - inicio).count();
+
+        salvarMatriz("resultado_sequencial.txt", resultado, tempo);
+
+        cout << "resultado salvo em resultado_sequencial.txt" << endl;
+        cout << "Tempo total (ms): " << tempo << endl;
+
+    } catch (const exception& erro) {
+        cerr << erro.what() << endl;
         return 1;
     }
 
