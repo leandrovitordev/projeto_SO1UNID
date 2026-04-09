@@ -10,228 +10,215 @@
 
 using namespace std;
 
-using matriz_ = vector<vector<int>>;
+using Matriz = vector<vector<int>>;
 
-struct dados_processo_ {
-    int id_;
-    int linha_inicial_;
-    int linha_final_;
+struct ProcessData {
+    int id;
+    int inicio;
+    int fim;
 };
 
-matriz_ ler_matriz_(const string& nome_arquivo_) {
-    // Esta funcao le a matriz salva em texto; neste caso o formato e identico ao usado nos demais programas;
-    ifstream arquivo_(nome_arquivo_);
+// lê matriz do arquivo
+Matriz lerMatriz(const string& nomeArquivo) {
+    ifstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        throw runtime_error("Erro ao abrir o arquivo: " + nome_arquivo_);
+    if (!arquivo.is_open()) {
+        throw runtime_error("erro ao abrir arquivo: " + nomeArquivo);
     }
 
-    int linhas_ = 0;
-    int colunas_ = 0;
-    arquivo_ >> linhas_ >> colunas_;
+    int linhas, colunas;
+    arquivo >> linhas >> colunas;
 
-    if (linhas_ <= 0 || colunas_ <= 0) {
-        throw runtime_error("Dimensoes invalidas no arquivo: " + nome_arquivo_);
+    if (linhas <= 0 || colunas <= 0) {
+        throw runtime_error("dimensoes invalidas em: " + nomeArquivo);
     }
 
-    matriz_ matriz_lida_(linhas_, vector<int>(colunas_, 0));
+    Matriz matriz(linhas, vector<int>(colunas, 0));
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // Cada valor e lido conforme a ordem do arquivo; Isso faz com que a estrutura original seja preservada;
-            arquivo_ >> matriz_lida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo >> matriz[i][j]; // leitura normal
         }
     }
 
-    arquivo_.close();
-    return matriz_lida_;
+    return matriz;
 }
 
-void salvar_matriz_(const string& nome_arquivo_, const matriz_& matriz_saida_, double tempo_total_) {
-    // Esta funcao grava o resultado parcial de um processo; neste caso o tempo individual tambem fica salvo;
-    ofstream arquivo_(nome_arquivo_);
+// salva resultado do processo
+void salvarMatriz(const string& nomeArquivo, const Matriz& matriz, double tempo) {
+    ofstream arquivo(nomeArquivo);
 
-    if (!arquivo_.is_open()) {
-        cerr << "Erro ao abrir o arquivo: " << nome_arquivo_ << endl;
+    if (!arquivo.is_open()) {
+        cerr << "erro ao abrir arquivo: " << nomeArquivo << endl;
         return;
     }
 
-    int linhas_ = static_cast<int>(matriz_saida_.size());
-    int colunas_ = (linhas_ > 0) ? static_cast<int>(matriz_saida_[0].size()) : 0;
+    int linhas = matriz.size();
+    int colunas = (linhas > 0) ? matriz[0].size() : 0;
 
-    arquivo_ << linhas_ << " " << colunas_ << "\n";
+    arquivo << linhas << " " << colunas << "\n";
 
-    for (int i_ = 0; i_ < linhas_; ++i_) {
-        for (int j_ = 0; j_ < colunas_; ++j_) {
-            // Gravamos apenas as linhas calculadas por este processo; Isso faz com que cada arquivo seja independente;
-            arquivo_ << matriz_saida_[i_][j_];
+    for (int i = 0; i < linhas; i++) {
+        for (int j = 0; j < colunas; j++) {
+            arquivo << matriz[i][j];
 
-            if (j_ + 1 < colunas_) {
-                arquivo_ << " ";
+            if (j + 1 < colunas) {
+                arquivo << " ";
             }
         }
-
-        arquivo_ << "\n";
+        arquivo << "\n";
     }
 
-    arquivo_ << "Tempo total (ms): " << tempo_total_ << "\n";
-    arquivo_.close();
+    arquivo << "Tempo total (ms): " << tempo << "\n";
 }
 
-void multiplicar_parte_(
-    const matriz_& matriz1_,
-    const matriz_& matriz2_,
-    matriz_& resultado_,
-    int linha_inicial_original_,
-    int linha_inicial_local_,
-    int linha_final_original_
+// multiplicação de um bloco
+void multiplicarParte(
+    const Matriz& m1,
+    const Matriz& m2,
+    Matriz& resultado,
+    int inicio,
+    int base
 ) {
-    // Esta funcao reaplica a multiplicacao classica em um intervalo; neste caso o resultado vai para uma matriz parcial;
-    int colunas_resultado_ = static_cast<int>(matriz2_[0].size());
-    int dimensao_interna_ = static_cast<int>(matriz2_.size());
+    int colunas = m2[0].size();
+    int comum = m2.size();
 
-    for (int i_original_ = linha_inicial_original_; i_original_ < linha_final_original_; ++i_original_) {
-        int i_local_ = i_original_ - linha_inicial_local_;
+    for (int i = inicio; i < base; i++) {
+        int iLocal = i - inicio;
 
-        for (int j_ = 0; j_ < colunas_resultado_; ++j_) {
-            int soma_ = 0;
+        for (int j = 0; j < colunas; j++) {
+            int soma = 0;
 
-            for (int k_ = 0; k_ < dimensao_interna_; ++k_) {
-                // A soma acumulada segue a definicao da multiplicacao matricial; Isso faz com que o bloco fique correto;
-                soma_ += matriz1_[i_original_][k_] * matriz2_[k_][j_];
+            for (int k = 0; k < comum; k++) {
+                soma += m1[i][k] * m2[k][j];
             }
 
-            resultado_[i_local_][j_] = soma_;
+            resultado[iLocal][j] = soma;
         }
     }
 }
 
-int main(int argc_, char* argv_[]) {
-    // O programa de processos tambem recebe dois arquivos e T; neste caso T representa a quantidade de processos filhos;
-    if (argc_ != 4) {
-        cerr << "Uso: ./processos matriz1.txt matriz2.txt T" << endl;
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        cerr << "uso: ./processos matriz1.txt matriz2.txt T" << endl;
         return 1;
     }
 
     try {
-        // A leitura e feita antes do fork; Isso faz com que o requisito seja obedecido e os dados ja existam na memoria;
-        matriz_ matriz1_ = ler_matriz_(argv_[1]);
-        matriz_ matriz2_ = ler_matriz_(argv_[2]);
-        int total_processos_ = stoi(argv_[3]);
+        Matriz m1 = lerMatriz(argv[1]);
+        Matriz m2 = lerMatriz(argv[2]);
+        int total = stoi(argv[3]);
 
-        if (total_processos_ <= 0) {
-            cerr << "Erro: T deve ser maior que zero." << endl;
+        if (total <= 0) {
+            cerr << "erro: numero de processos invalido" << endl;
             return 1;
         }
 
-        int n1_ = static_cast<int>(matriz1_.size());
-        int m1_ = static_cast<int>(matriz1_[0].size());
-        int n2_ = static_cast<int>(matriz2_.size());
-        int m2_ = static_cast<int>(matriz2_[0].size());
+        int n1 = m1.size();
+        int m1c = m1[0].size();
+        int n2 = m2.size();
+        int m2c = m2[0].size();
 
-        // Confirmamos se a multiplicacao e valida; neste caso a regra obrigatoria e m1 igual a n2;
-        if (m1_ != n2_) {
-            cerr << "Erro: numero de colunas da primeira matriz deve ser igual ao numero de linhas da segunda matriz." << endl;
+        // checando se dá pra multiplicar
+        if (m1c != n2) {
+            cerr << "erro: matrizes incompativeis" << endl;
             return 1;
         }
 
-        // Limitamos a quantidade de processos ao numero de linhas; Isso faz com que nao haja processos ociosos;
-        if (total_processos_ > n1_) {
-            total_processos_ = n1_;
+        // evita processo sem trabalho
+        if (total > n1) {
+            total = n1;
         }
 
-        vector<dados_processo_> dados_processos_(total_processos_);
-        vector<pid_t> pids_(total_processos_, -1);
-        vector<string> arquivos_tempo_(total_processos_);
+        vector<ProcessData> dados(total);
+        vector<pid_t> pids(total, -1);
+        vector<string> arquivosTempo(total);
 
-        int linhas_base_ = n1_ / total_processos_;
-        int resto_ = n1_ % total_processos_;
-        int linha_atual_ = 0;
+        int base = n1 / total;
+        int resto = n1 % total;
+        int atual = 0;
 
-        for (int i_ = 0; i_ < total_processos_; ++i_) {
-            int extra_ = (i_ < resto_) ? 1 : 0;
-            dados_processos_[i_].id_ = i_;
-            dados_processos_[i_].linha_inicial_ = linha_atual_;
-            dados_processos_[i_].linha_final_ = linha_atual_ + linhas_base_ + extra_;
-            arquivos_tempo_[i_] = "tempo_processo_" + to_string(i_) + ".txt";
-            linha_atual_ = dados_processos_[i_].linha_final_;
+        for (int i = 0; i < total; i++) {
+            int extra = (i < resto) ? 1 : 0;
+
+            dados[i].id = i;
+            dados[i].inicio = atual;
+            dados[i].fim = atual + base + extra;
+
+            arquivosTempo[i] = "tempo_processo_" + to_string(i) + ".txt";
+
+            atual = dados[i].fim;
         }
 
-        for (int i_ = 0; i_ < total_processos_; ++i_) {
-            pid_t pid_ = fork();
+        for (int i = 0; i < total; i++) {
+            pid_t pid = fork();
 
-            if (pid_ < 0) {
-                cerr << "Erro ao criar processo." << endl;
+            if (pid < 0) {
+                cerr << "erro ao criar processo" << endl;
                 return 1;
             }
 
-            if (pid_ == 0) {
-                // O processo filho calcula apenas seu intervalo; neste caso tambem grava seu proprio tempo em arquivo auxiliar;
-                int quantidade_linhas_ = dados_processos_[i_].linha_final_ - dados_processos_[i_].linha_inicial_;
-                matriz_ resultado_parcial_(quantidade_linhas_, vector<int>(m2_, 0));
+            if (pid == 0) {
+                // filho calcula só sua parte
+                int linhas = dados[i].fim - dados[i].inicio;
 
-                auto inicio_ = chrono::high_resolution_clock::now();
+                Matriz resultado(linhas, vector<int>(m2c, 0));
 
-                multiplicar_parte_(
-                    matriz1_,
-                    matriz2_,
-                    resultado_parcial_,
-                    dados_processos_[i_].linha_inicial_,
-                    dados_processos_[i_].linha_inicial_,
-                    dados_processos_[i_].linha_final_
-                );
+                auto inicio = chrono::high_resolution_clock::now();
 
-                auto fim_ = chrono::high_resolution_clock::now();
-                double tempo_ms_ = chrono::duration<double, milli>(fim_ - inicio_).count();
+                multiplicarParte(m1, m2, resultado, dados[i].inicio, dados[i].fim);
 
-                string nome_resultado_ = "resultado_processo_" + to_string(dados_processos_[i_].id_) + ".txt";
-                salvar_matriz_(nome_resultado_, resultado_parcial_, tempo_ms_);
+                auto fim = chrono::high_resolution_clock::now();
 
-                ofstream arquivo_tempo_(arquivos_tempo_[i_]);
+                double tempo = chrono::duration<double, milli>(fim - inicio).count();
 
-                if (arquivo_tempo_.is_open()) {
-                    // O tempo tambem e salvo isoladamente para o pai ler depois; Isso faz com que o maximo possa ser calculado;
-                    arquivo_tempo_ << tempo_ms_ << "\n";
-                    arquivo_tempo_.close();
+                string nome = "resultado_processo_" + to_string(dados[i].id) + ".txt";
+                salvarMatriz(nome, resultado, tempo);
+
+                // salva tempo separado (gambiarra mas funciona kk)
+                ofstream arqTempo(arquivosTempo[i]);
+                if (arqTempo.is_open()) {
+                    arqTempo << tempo << "\n";
                 }
 
                 _exit(0);
             }
 
-            pids_[i_] = pid_;
+            pids[i] = pid;
         }
 
-        for (int i_ = 0; i_ < total_processos_; ++i_) {
-            int status_ = 0;
-            waitpid(pids_[i_], &status_, 0);
+        // espera todos os filhos
+        for (int i = 0; i < total; i++) {
+            int status = 0;
+            waitpid(pids[i], &status, 0);
 
-            if (!WIFEXITED(status_)) {
-                cerr << "Erro: um processo filho nao terminou corretamente." << endl;
+            if (!WIFEXITED(status)) {
+                cerr << "erro: processo nao terminou direito" << endl;
                 return 1;
             }
         }
 
-        double tempo_total_ = 0.0;
+        double tempoTotal = 0;
 
-        for (int i_ = 0; i_ < total_processos_; ++i_) {
-            ifstream arquivo_tempo_(arquivos_tempo_[i_]);
-            double tempo_ms_ = 0.0;
+        // pega o maior tempo
+        for (int i = 0; i < total; i++) {
+            ifstream arqTempo(arquivosTempo[i]);
+            double tempo = 0;
 
-            if (arquivo_tempo_.is_open()) {
-                // O pai le os tempos produzidos pelos filhos; neste caso escolhemos o maior deles;
-                arquivo_tempo_ >> tempo_ms_;
-                arquivo_tempo_.close();
+            if (arqTempo.is_open()) {
+                arqTempo >> tempo;
             }
 
-            if (tempo_ms_ > tempo_total_) {
-                tempo_total_ = tempo_ms_;
+            if (tempo > tempoTotal) {
+                tempoTotal = tempo;
             }
         }
 
-        cout << "Arquivos parciais dos processos gerados com sucesso." << endl;
-        cout << "Tempo total (ms): " << tempo_total_ << endl;
-    } catch (const exception& erro_) {
-        cerr << erro_.what() << endl;
+        cout << "processos finalizados" << endl;
+        cout << "Tempo total (ms): " << tempoTotal << endl;
+
+    } catch (const exception& e) {
+        cerr << e.what() << endl;
         return 1;
     }
 
