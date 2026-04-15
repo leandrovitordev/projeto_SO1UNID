@@ -170,16 +170,22 @@ int main(int argc, char* argv[]) {
 
                 auto fim = chrono::high_resolution_clock::now();
 
-                double tempo = chrono::duration<double, milli>(fim - inicio).count();
+                double tempo_ms_ = chrono::duration<double, milli>(fim - inicio).count();
 
                 string nome = "resultado_processo_" + to_string(dados[i].id) + ".txt";
-                salvarMatriz(nome, resultado, tempo);
+                salvarMatriz(nome, resultado, tempo_ms_);
 
-                // salva tempo separado (gambiarra mas funciona kk)
+                cout << "Tempo total (ms): " << tempo_ms_ << endl;
+
                 ofstream arqTempo(arquivosTempo[i]);
-                if (arqTempo.is_open()) {
-                    arqTempo << tempo << "\n";
+                if (!arqTempo.is_open()) {
+                    cerr << "erro ao abrir arquivo: " << arquivosTempo[i] << endl;
+                    _exit(1);
                 }
+
+                arqTempo << tempo_ms_ << "\n";
+                arqTempo.flush();
+                arqTempo.close();
 
                 _exit(0);
             }

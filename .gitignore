@@ -1,3 +1,21 @@
 *.exe
-*.txt
 .vscode/
+.codex
+
+# Binarios gerados localmente
+auxiliar
+sequencial
+threads
+processos
+
+# Arquivos de saida e temporarios
+resultado_*.txt
+tempo_processo_*.txt
+resultados.csv
+*.tmp
+*.temp
+
+# Permitir arquivos essenciais do projeto
+!run_final.sh
+!matriz1.txt
+!matriz2.txt
